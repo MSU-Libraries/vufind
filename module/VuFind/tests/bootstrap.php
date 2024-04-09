@@ -27,8 +27,9 @@
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
 
+define('VUFIND_HOME', getenv('VUFIND_HOME') ?: __DIR__ . '/../../..');
 require __DIR__ . '/bootstrap_constants.php';
-require __DIR__ . '/../../../config/constants.config.php';
+require VUFIND_HOME . '/config/constants.config.php';
 
 chdir(APPLICATION_PATH);
 
@@ -40,10 +41,10 @@ if (file_exists('vendor/autoload.php')) {
     $loader->add('VuFindTest', __DIR__ . '/unit-tests/src');
     $loader->add('VuFindTest', __DIR__ . '/../src');
     // Dynamically discover all module src directories:
-    $modules = opendir(__DIR__ . '/../..');
+    $modules = opendir(VUFIND_HOME . '/module');
     while ($mod = readdir($modules)) {
         $mod = trim($mod, '.'); // ignore . and ..
-        $dir = empty($mod) ? false : realpath(__DIR__ . "/../../{$mod}/src");
+        $dir = empty($mod) ? false : realpath(VUFIND_HOME . "/module/{$mod}/src");
         if (!empty($dir) && is_dir($dir . '/' . $mod)) {
             $loader->add($mod, $dir);
         }
