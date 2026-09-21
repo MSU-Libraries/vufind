@@ -30,6 +30,8 @@
 
 namespace VuFindTest\ILS\Driver;
 
+use GuzzleHttp\Promise;
+use GuzzleHttp\Psr7;
 use Laminas\Http\Response;
 use VuFind\ILS\Driver\Folio;
 
@@ -149,6 +151,62 @@ class FolioTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
+     * Replace makeRequestAsync to inject test returns
+     *
+     * @param string       $path    API path (with a leading /)
+     * @param string|array $params  Parameters object to be sent as data
+     * @param array        $headers Additional headers
+     *
+     * @return Promise\FulfilledPromise
+     */
+    public function mockMakeRequestAsync(
+        string $path = '/',
+        $params = [],
+        array $headers = []
+    ): Promise\FulfilledPromise {
+        // Run preRequest
+        $httpHeaders = new \Laminas\Http\Headers();
+        $httpHeaders->addHeaders($headers);
+        [$httpHeaders, $params] = $this->driver->preRequest($httpHeaders, $params);
+
+        // Get the next step of the test, and make assertions as necessary
+        // (we'll skip making assertions if the next step is empty):
+        $testData = $this->fixtureSteps[$this->currentFixtureStep] ?? [];
+        $this->currentFixtureStep++;
+        unset($testData['comment']);
+        if (!empty($testData)) {
+            $msg = "Error in step {$this->currentFixtureStep} of fixture: "
+                . $this->currentFixture;
+            $this->assertEquals($testData['expectedPath'] ?? '/', $path, $msg);
+            if (isset($testData['expectedParamsRegEx'])) {
+                $this->assertMatchesRegularExpression(
+                    $testData['expectedParamsRegEx'],
+                    $params,
+                    $msg
+                );
+            } else {
+                $this
+                    ->assertEquals($testData['expectedParams'] ?? [], $params, $msg);
+            }
+            $actualHeaders = $httpHeaders->toArray();
+            foreach ($testData['expectedHeaders'] ?? [] as $header => $expected) {
+                $this->assertEquals($expected, $actualHeaders[$header]);
+            }
+        }
+
+        // Create response
+        $bodyType = $testData['bodyType'] ?? 'string';
+        $rawBody = $testData['body'] ?? '';
+        $body = $bodyType === 'json' ? json_encode($rawBody) : $rawBody;
+        $response = new Psr7\Response(
+            $testData['status'] ?? 200,
+            $testData['headers'] ?? [],
+            $body
+        );
+        return new Promise\FulfilledPromise($response);
+    }
+
+    /**
      * Generate a new Folio driver to return responses set in a json fixture
      *
      * Overwrites $this->driver
@@ -173,7 +231,7 @@ class FolioTest extends \PHPUnit\Framework\TestCase
         // Create a stub for the SomeClass class
         $this->driver = $this->getMockBuilder(Folio::class)
             ->setConstructorArgs([new \VuFind\Date\Converter(), $factory])
-            ->onlyMethods(['makeRequest'])
+            ->onlyMethods(['makeRequest','makeRequestAsync'])
             ->getMock();
         // Configure the stub
         $this->driver->setConfig($config ?? $this->defaultDriverConfig);
@@ -183,6 +241,9 @@ class FolioTest extends \PHPUnit\Framework\TestCase
         $this->driver->expects($this->any())
             ->method('makeRequest')
             ->willReturnCallback([$this, 'mockMakeRequest']);
+        $this->driver->expects($this->any())
+            ->method('makeRequestAsync')
+            ->willReturnCallback([$this, 'mockMakeRequestAsync']);
         $this->driver->init();
     }
 
@@ -1410,13 +1471,13 @@ class FolioTest extends \PHPUnit\Framework\TestCase
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\Depends('testTokens')]
-    public function testGetBoundWithRecords(): void
+    public function testGetBoundWithRecordsPromise(): void
     {
         $this->createConnector('get-bound-with-records');
         $item = [
             'id' => 'bc3fd525-4254-4075-845b-1428986d811b',
         ];
-        $result = $this->callMethod($this->driver, 'getBoundWithRecords', [(object)$item]);
+        $result = $this->callMethod($this->driver, 'getBoundWithRecordsPromise', [(object)$item])->wait();
         $expected = [
             [
                 'title' => 'Slavery as it once prevailed in Massachusetts : A lecture for the Massachusetts ' .
