@@ -98,7 +98,8 @@ abstract class AbstractAPI extends AbstractBase implements
      */
     protected function getPool(): GuzzleLivePool
     {
-        return $this->pool ??= new GuzzleLivePool($this->getClient());
+        $concurrency = intval($this->config['Catalog']['concurrency'] ?? null);
+        return $this->pool ??= new GuzzleLivePool($this->getClient(), $concurrency);
     }
 
     /**
@@ -165,15 +166,18 @@ abstract class AbstractAPI extends AbstractBase implements
      * Support method for makeRequest to process an unexpected status code. Can return true to trigger
      * a retry of the API call or false to throw an exception.
      *
-     * @param Response $response      HTTP response
-     * @param int      $attemptNumber Counter to keep track of attempts (starts at 1 for the first attempt)
+     * @param Response|Psr7\Response $response      HTTP response
+     * @param int                    $attemptNumber Counter to keep track of attempts
+     *                                              (starts at 1 for the first attempt)
      *
      * @return bool
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    protected function shouldRetryAfterUnexpectedStatusCode(Response $response, int $attemptNumber): bool
-    {
+    protected function shouldRetryAfterUnexpectedStatusCode(
+        Response|Psr7\Response $response,
+        int $attemptNumber
+    ): bool {
         // No retries by default.
         return false;
     }

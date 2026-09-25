@@ -166,13 +166,16 @@ class Folio extends AbstractAPI implements
      * Support method for makeRequest to process an unexpected status code. Can return true to trigger
      * a retry of the API call or false to throw an exception.
      *
-     * @param Response $response      HTTP response
-     * @param int      $attemptNumber Counter to keep track of attempts (starts at 1 for the first attempt)
+     * @param Response|Psr7\Response $response      HTTP response
+     * @param int                    $attemptNumber Counter to keep track of attempts
+     *                                              (starts at 1 for the first attempt)
      *
      * @return bool
      */
-    protected function shouldRetryAfterUnexpectedStatusCode(Response $response, int $attemptNumber): bool
-    {
+    protected function shouldRetryAfterUnexpectedStatusCode(
+        Response|Psr7\Response $response,
+        int $attemptNumber
+    ): bool {
         // If the unexpected status is 401, and the token renews successfully, and we have not yet
         // retried, we should try again:
         if ($response->getStatusCode() === 401 && !$this->checkTenantToken() && $attemptNumber < 2) {
@@ -234,7 +237,10 @@ class Folio extends AbstractAPI implements
             unset($logParams['password']);
         }
         // truncate headers for token obscuring
-        $logHeaders = $req_headers->toArray();
+        $logHeaders = $req_headers;
+        if (!is_array($req_headers)) {
+            $logHeaders = $req_headers->toArray();
+        }
         if (isset($logHeaders['X-Okapi-Token'])) {
             $logHeaders['X-Okapi-Token'] = substr(
                 $logHeaders['X-Okapi-Token'],

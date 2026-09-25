@@ -91,10 +91,10 @@ class GuzzleLivePool
      * @param ClientInterface $client      The GuzzleHTTP client for the pool to use
      * @param int             $concurrency Max number of concurrent API calls
      */
-    public function __construct(ClientInterface $client, int $concurrency = 20)
+    public function __construct(ClientInterface $client, int $concurrency = 10)
     {
         $this->client = $client;
-        $this->concurrency = $concurrency;
+        $this->concurrency = $concurrency < 1 ? 1 : $concurrency;
     }
 
     /**
@@ -198,7 +198,7 @@ class GuzzleLivePool
             $promise = reset($this->activePromises);
             try {
                 $promise->wait();
-            } catch (Throwable $_) {
+            } catch (Throwable) {
                 // We don't catch anything here; let a request's ->then() handling deal with it
             }
         }
